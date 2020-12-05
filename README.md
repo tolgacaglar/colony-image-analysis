@@ -19,3 +19,8 @@ _____
 - The codes are currently working, but will have more organization with every commit
 - Will create a new branch for organizing
 - Will organize the readme.md file accordingly.
+
+#### Update code:
+##### 12/04/2020
+- Create files for a better organization
+- MergeGrid file is missing the implementation. 
