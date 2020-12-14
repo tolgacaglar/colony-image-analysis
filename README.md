@@ -5,7 +5,7 @@ Combines the 3x3 grid of colony images and analyses the stitched images for radi
 Python 3.7.4  
 opencv 4.5.0  
 numpy 1.19.1  
-matplotlib 3.3.2
+matplotlib 3.3.2  
 pandas 1.1.3
 
 ## What the program can do [planning]
