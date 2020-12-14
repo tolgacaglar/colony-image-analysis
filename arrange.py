@@ -14,8 +14,9 @@ class MergeGrid:      # Merging the pictures together
     Args:   
         xml_path_ar - an array of xml paths
     Returns:
+        MxN sized tiff image.
     """
-    def __init__(self, xml_path_ar):
+    def __init__(self, xml_path_ar, ):
         self.xml_path_ar = xml_path_ar 
 
         # run through each xml path of the position
