@@ -29,9 +29,86 @@ def getFileName(fname, zix, zstr, tix, tstr, six, sstr):
     
     return fname_ret
 
+# Image dimension description from the xml file
+def collectImageDim(image_xml):
+    image_description = None
+    img_name = ""
+    xsz = ysz = zsz = ssz = tsz = None
+    xvoxel = yvoxel = zvoxel = None
+    xunit = yunit = zunit = ""
+    for child in image:
+        if child.tag == "ImageDescription":
+            image_description = child
+            for gchild in image_description:
+                if gchild.tag == "Name":    # Name of the image
+                    img_name = gchild.text
+                elif gchild.tag == "Dimensions":     # x,y,z,stage,t dimensions
+                    # Run through each deminson description
+                    for ggchild in gchild:
+                        if ggchild.tag == "DimensionDescription":   # Check for tag
+                            if ggchild.get("DimID") == "X":
+                                xsz = int(ggchild.get("NumberOfElements"))
+                                xvoxel = np.double(ggchild.get("Voxel"))
+                                xunit = ggchild.get("Unit")
+                            elif ggchild.get("DimID") == "Y":
+                                ysz = int(ggchild.get("NumberOfElements"))
+                                yvoxel = np.double(ggchild.get("Voxel"))
+                                yunit = ggchild.get("Unit")
+                            elif ggchild.get("DimID") == "Z":
+                                zsz = int(ggchild.get("NumberOfElements"))
+                                zvoxel = np.double(ggchild.get("Voxel"))
+                                zunit = ggchild.get("Unit")
+                            elif ggchild.get("DimID") == "Stage":
+                                ssz = int(ggchild.get("NumberOfElements"))
+                                svoxel = np.double(ggchild.get("Voxel"))
+                            elif ggchild.get("DimID") == "T":
+                                tsz = int(ggchild.get("NumberOfElements"))
+                                # Note: tvoxel is not used!!
+                                # Each image has its own timestamp data
+    # Returns a dictionary of dimension descriptions
+    return {"img_name": img_name,
+            "xsz": xsz, "xvoxel": xvoxel, "xunit": xunit,
+            "ysz": ysz, "yvoxel": yvoxel, "yunit": yunit,
+            "zsz": zsz, "zvoxel": zvoxel, "zunit": zunit,
+            "ssz": ssz, "svoxel": svoxel,
+            "tsz": tsz}
+
+# Tilescan Information from the xml file
+def collectTileScan(image_xml):
+    # TileScan images are saved in parameter s**.
+    # Get the tilescan info
+    tilescan_info = None
+    for child in image_xml:
+        if child.get("Name") == "TileScanInfo":
+            print("tilescan is set")
+            tilescan_info = child
+            break
+
+    xix_lst, yix_lst = [],[]     # x,y indices for each tile
+    xpos_lst, ypos_lst = [],[]    # x,y positions for each tile
+    # Run through each tile to take position information
+    for tile in tilescan_info:
+        xix_lst.append(int(tile.get("FieldX")))
+        yix_lst.append(int(tile.get("FieldY")))
+        xpos_lst.append(np.double(tile.get("PosX")))
+        ypos_lst.append(np.double(tile.get("PosY")))
+
+    # unique x,y indices for each tile
+    xix_unique_ar = np.unique(xix_lst)
+    yix_unique_ar = np.unique(yix_lst)
+
+    # y is inverted, so have another inverse
+    for i in range(len(xix_lst)):
+        xix_lst[i] = len(xix_unique_ar) - xix_lst[i] - 1
+
+    return {"xix_lst": xix_lst, "yix_lst": yix_lst,
+            "xix_unique_ar": xix_unique_ar, "yix_unique_ar": yix_unique_ar,
+            "xpos_lst": xpos_lst, "ypos_lst": ypos_lst
+            }
+
 # Folder for the files
-folder = "D:/Tolga/Colony Images/12112020/3dTimeScan_12h/"
-xml_fname = "MetaData/EQ59_Single_Colony_TilesScan.lif_3dTimeScan_12h_init_Properties.xml"
+folder = "D:/Tolga/Colony Images/12112020/3dTimeScan_17h_init_long/"
+xml_fname = "MetaData/EQ59_Single_Colony_TilesScan.lif_3dTimeScan_17h_init_long_Properties.xml"
 
 xml_path = folder + xml_fname
 tree = ET.parse(xml_path)    # xml tree of the current stage position
@@ -39,77 +116,22 @@ root = tree.getroot()           # root of the xml tree
 
 image = root[0]
 
-# TileScan images are saved in parameter s**.
-# Get the tilescan info
-tilescan_info = None
-for child in image:
-    if child.get("Name") == "TileScanInfo":
-        print("tilescan is set")
-        tilescan_info = child
-        break
-
-snum = len(tilescan_info)
-xix_lst, yix_lst = [],[]     # x,y indices for each tile
-xpos_lst, ypos_lst = [],[]    # x,y positions for each tile
-# Run through each tile to take position information
-for tile in tilescan_info:
-    xix_lst.append(int(tile.get("FieldX")))
-    yix_lst.append(int(tile.get("FieldY")))
-    xpos_lst.append(np.double(tile.get("PosX")))
-    ypos_lst.append(np.double(tile.get("PosY")))
-
-# unique x,y indices for each tile
-xix_unique_ar = np.unique(xix_lst)
-yix_unique_ar = np.unique(yix_lst)
-
-# y is inverted, so have another inverse
-for i in range(len(xix_lst)):
-    xix_lst[i] = len(xix_unique_ar) - xix_lst[i] - 1
-# y is inverted, so have another inverse
-#for i in range(len(yix_lst)):
-#    yix_lst[i] = len(yix_unique_ar) - yix_lst[i] - 1
-
-# Collect the image information for each
-image_description = None
-img_name = ""
-xsz = ysz = zsz = ssz = tsz = None
-xvoxel = yvoxel = zvoxel = None
-for child in image:
-    if child.tag == "ImageDescription":
-        image_description = child
-        for gchild in image_description:
-            if gchild.tag == "Name":    # Name of the image
-                img_name = gchild.text
-            elif gchild.tag == "Dimensions":     # x,y,z,stage,t dimensions
-                # Run through each deminson description
-                for ggchild in gchild:
-                    if ggchild.tag == "DimensionDescription":   # Check for tag
-                        if ggchild.get("DimID") == "X":
-                            xsz = int(ggchild.get("NumberOfElements"))
-                            xvoxel = np.double(ggchild.get("Voxel"))
-                        elif ggchild.get("DimID") == "Y":
-                            ysz = int(ggchild.get("NumberOfElements"))
-                            yvoxel = np.double(ggchild.get("Voxel"))
-                        elif ggchild.get("DimID") == "Z":
-                            zsz = int(ggchild.get("NumberOfElements"))
-                            zvoxel = np.double(ggchild.get("Voxel"))
-                        elif ggchild.get("DimID") == "Stage":
-                            ssz = int(ggchild.get("NumberOfElements"))
-                            svoxel = np.double(ggchild.get("Voxel"))
-                        elif ggchild.get("DimID") == "T":
-                            tsz = int(ggchild.get("NumberOfElements"))
-                            # Note: tvoxel is not used!!
-                            # Each image has its own timestamp data
+# Image dimension description
+dim_desc = collectImageDim(image)
+# TileScan description
+tile_desc = collectTileScan(image)
 
 # Copy all .tif file into a list
 fname_list = glob.glob(folder+"TileScan/*.tif")
 # For each file, collect string identifierse for t,s and z
 tstr_st, sstr_st, zstr_st = set(),set(),set()
-tstr_ix = 8     # timepoint identifier index
-sstr_ix = 9     # stagepos identifier index
-zstr_ix = 10    # z-scan identifier index
+tstr_ix = 11     # timepoint identifier index
+sstr_ix = 12     # stagepos identifier index
+zstr_ix = 13    # z-scan identifier index
 
 print("Did you check the tstr_ix, sstr_ix and zstr_ix??")
+print("tstr = %s " % (fname_list[0].split("_")[tstr_ix]))
+print("sstr = %s " % (fname_list[0].split("_")[sstr_ix]))
 print("zstr = %s " % (fname_list[0].split("_")[zstr_ix]))
 
 for fname in fname_list:
@@ -141,12 +163,12 @@ for tix in range(len(tstr_ar)):
         zstr = zstr_ar[zix]
         # File path to merge into
         if tstr is not None:
-            fpath_merged = folder + "Merged/" + img_name + "_" + tstr + "_" + zstr + ".tif"
+            fpath_merged = folder + "Merged/" + dim_desc["img_name"] + "_" + tstr + "_" + zstr + ".tif"
         else:
-            fpath_merged = folder + "Merged/" + img_name + "_" + zstr + ".tif"
+            fpath_merged = folder + "Merged/" + dim_desc["img_name"] + "_" + zstr + ".tif"
         
         # Create empty merged image
-        img_merged_bw = np.zeros((width*len(xix_unique_ar),height*len(yix_unique_ar)), dtype=img_test.dtype)
+        img_merged_bw = np.zeros((width*len(tile_desc["xix_unique_ar"]),height*len(tile_desc["yix_unique_ar"])), dtype=img_test.dtype)
 
         for six in range(len(sstr_ar)):    # Run over the stage positions -> single merged tif file
             sstr = sstr_ar[six]
@@ -157,8 +179,8 @@ for tix in range(len(tstr_ar)):
             height,width = img.shape
             
             # x,y indices
-            xix = xix_lst[six]
-            yix = yix_lst[six]
+            xix = tile_desc["xix_lst"][six]
+            yix = tile_desc["yix_lst"][six]
             # Image pixel positions
             xixar = np.arange(0,width) + width*xix
             yixar = np.arange(0,height) + height*yix
