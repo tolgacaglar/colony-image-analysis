@@ -103,5 +103,6 @@ def collectTileScan(image_xml):
 
     return {"xix_lst": xix_lst, "yix_lst": yix_lst,
             "xix_unique_ar": xix_unique_ar, "yix_unique_ar": yix_unique_ar,
-            "xpos_lst": xpos_lst, "ypos_lst": ypos_lst
+            "xpos_lst": xpos_lst, "ypos_lst": ypos_lst,
+            "tile_xcnt": len(xix_unique_ar), "tile_ycnt": len(yix_unique_ar)
             }
