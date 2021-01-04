@@ -18,6 +18,7 @@ class IndexTracker(object):
                            extent = self.args_dict.get("extent"))
         self.zvals = self.args_dict.get("zvals")
         self.zunit = self.args_dict.get("zunit")
+        self.zstr = self.args_dict.get("zstr")
         self.zval = None
         if (self.zvals is not None):
             self.zval = self.zvals[self.ind]
@@ -36,7 +37,7 @@ class IndexTracker(object):
         # Set zval
         if self.zval is not None:
             self.zval = self.zvals[self.ind]
-            self.ax.set_ylabel("z %.3f %s" % (self.zval, self.zunit))
+            self.ax.set_ylabel("%s = %.3f %s" % (self.zstr, self.zval, self.zunit))
         else:
             self.ax.set_ylabel("split %s" % (self.ind))
         self.im.axes.figure.canvas.draw()
