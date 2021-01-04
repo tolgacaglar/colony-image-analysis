@@ -38,20 +38,34 @@ video_path = base_folder + f"{fnamestr}_t{tix}.avi"
 ```
 where the variable `fnamestr` is the name of the .lif file as defined earlier, and `tix` is the timepoint identifier as defined by the software.
 
-5. The detailed information of the 
-## What the program can do [planning]
-1. Combine 3x3 grid images using the xml information provided by the microscope in the folder Metadata
-    - read xml data for each position
-    - make the 3x3 grid, and define the array indices for combining all into a single image
-    - write each combined tif image into a new file, corresponding to each colony t and z value.
-2. 
-_____
-#### Notes:
-- The codes are currently working, but will have more organization with every commit
-- Will create a new branch for organizing
-- Will organize the readme.md file accordingly.
+5. The detailed information about the tiff images and the grid information is listed in the XML file in the folder
+```python
+metadata_path = base_folder + f"Metadata/{fname}_Properties.xml"
+```
+The details of the metadata file will be documented, but in short, the `ElementTree` is obtained from the imported module
+```python
+import xml.etree.ElementTree as ET
+```
+The number of images, timepoints, the position of each image and its dimensions can easily be extracted using the corresponding keys.
 
-#### Update code:
-##### 12/04/2020
-- Create files for a better organization
-- MergeGrid file is missing the implementation. 
+6. (Not yet implemented) data from each image will be coarse-grained by a binning procedure: chosen a small grid of PxP pixels, the number of pixels that reaches to a threshold value will be counted, so that the final information can be saved in a sparse (M/P x N/P) array.
+
+7. (Not yet implemented) From the final data, the edge of the colony will be extracted, and growth in both radial and height will be analyzed.
+
+## Install
+The program is tested on Windows, but since the dependencies are all from python libraries, the program should work in any platform supporting python 3.7+.
+
+(More instructions will be added as necessary)
+
+## Run
+1. (merge_tilescan.py): Merge the tilescan cimages to form a large tiff image for each z and t axis.
+
+2. (make_movie.py): For each timepoint, make a movie of a lower quality 512x512 with 4fps that scans through each xy-cross-section.
+
+3. (collect_data_movie.py): For each movie, extract data and save to a .csv file.
+
+4. (analyze_data.py): Construct the 3d structure of the colony and visualize for each time. Extract some colony-spatial properties, such as height and radius growth rate.
+
+
+#### Notes:
+- Currently, the Run 1 and 2 are done. Will have the newest organization in the full_project branch.
