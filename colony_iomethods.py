@@ -70,7 +70,7 @@ def collectImageDim(image_xml):
             "xsz": xsz, "xvoxel": xvoxel, "xunit": xunit,
             "ysz": ysz, "yvoxel": yvoxel, "yunit": yunit,
             "zsz": zsz, "zvoxel": zvoxel, "zunit": zunit,
-            "ssz": ssz, "svoxel": svoxel,
+            "ssz": ssz, "svoxel": None,
             "tsz": tsz}
 
 # Tilescan Information from the xml file
