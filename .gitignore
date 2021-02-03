@@ -131,6 +131,3 @@ dmypy.json
 # Image/Video files
 *.tif
 *.avi
-
-# csv files
-*.csv
