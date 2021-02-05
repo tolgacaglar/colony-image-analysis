@@ -128,9 +128,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Image/Video files
-*.tif
-*.avi
+# Resource file are too large
+# Only have a test folder to run at the end
+Resources/
 
-# csv files
-*.csv
+# No need to use the backup files anymore
+old_backup/
