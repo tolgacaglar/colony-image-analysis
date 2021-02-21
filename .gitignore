@@ -134,3 +134,6 @@ Resources/
 
 # No need to use the backup files anymore
 old_backup/
+
+# exclude vscode
+.vscode/
