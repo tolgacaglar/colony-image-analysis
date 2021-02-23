@@ -1,5 +1,5 @@
 class IndexTracker(object):
-    def __init__(self, ax, X, args_dict={}):
+    def __init__(self, ax, X, init_idx=None, args_dict={}):
         self.ax = ax
         if args_dict.get("title") is not None:
             ax.set_title(args_dict.get("title"))
@@ -8,7 +8,10 @@ class IndexTracker(object):
 
         self.X = X
         rows, cols, self.slices = X.shape
-        self.ind = self.slices//2
+        if init_idx is not None:
+            self.ind = init_idx
+        else:
+            self.ind = self.slices//2
         
         # Args dictionary, includes plot parameters
         # x,y limits saved in arg extent
