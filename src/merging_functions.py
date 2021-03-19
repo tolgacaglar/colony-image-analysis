@@ -1,0 +1,312 @@
+import pandas as pd
+import numpy as np
+import os
+import cv2
+
+from bs4 import BeautifulSoup
+
+# exp_name = "EQ59_Gly_02022021"
+# acq_name = "TileScan_Tp1-5"
+
+# exp_folder = f"D:/Tolga/Colony Images/{exp_name}/"
+# base_folder = exp_folder + f"{exp_name}_{acq_name}/"
+# metadata_folder = base_folder + "MetaData/"
+
+# xml_path = metadata_folder + f"{exp_name}_{acq_name}_Properties.xml"
+
+
+def collect_metadata(base_folder, exp_name, acq_name):
+    metadata_folder = os.path.join(base_folder, "MetaData")
+    xml_path = os.path.join(metadata_folder, f"{exp_name}_{acq_name}_Properties.xml")
+
+    # Read xml and prepare for the soup
+    with open(xml_path) as fp:
+        soup = BeautifulSoup(fp, "xml")
+
+    # Check for merged?
+    # Collect info about the tilescan
+    tilescan_info = soup.find_all("Tile")
+    # Variables to keep the information
+    xix_lst = np.zeros(len(tilescan_info), dtype=np.int32)
+    yix_lst = np.zeros_like(xix_lst)
+    xpos_lst = np.zeros_like(xix_lst, dtype=np.double)
+    ypos_lst = np.zeros_like(yix_lst, dtype=np.double)
+    # Run through each tile and save the position
+    for tile_idx in range(len(tilescan_info)):
+        tile = tilescan_info[tile_idx]
+        xix_lst[tile_idx] = tile.get("FieldX")
+        yix_lst[tile_idx] = tile.get("FieldY")
+        xpos_lst[tile_idx] = tile.get("PosX")
+        ypos_lst[tile_idx] = tile.get("PosY")
+
+    xix_unique_ar = np.unique(xix_lst)
+    yix_unique_ar = np.unique(yix_lst)
+    tiles = {"xix_lst": xix_lst,
+            "yix_lst": yix_lst,
+            "xix_unique_ar": xix_unique_ar,
+            "yix_unique_ar": yix_unique_ar,
+            "xpos_lst": xpos_lst,
+            "ypos_lst": ypos_lst,
+            "tile_xcnt": len(xix_unique_ar),
+            "tile_ycnt": len(yix_unique_ar)}
+
+    # Collect dimenions: x,y,z,t,stage (stage gives info about tilescan)
+    dimension_desc = soup.find_all("DimensionDescription")
+    dimensions = {}
+    for desc in dimension_desc:
+        dimid = desc.get("DimID")
+        unit = desc.get("Unit").replace("\xb5", "u")[-2:] # Replace greek letter of \mu with letter u
+        length = desc.get("Length")
+        counts = np.int32(desc.get("NumberOfElements"))
+        voxel = desc.get("Voxel")
+        # convert all length values to um
+        if len(unit) > 0:   # implies a numerical value
+            length = np.double(length)
+            voxel = np.double(voxel)
+            if unit == "mm":
+                length *= 1000
+                voxel *= 1000
+                unit = "um"
+        dimensions[dimid] = {"Length": length,
+                             "NumberOfElements": counts,
+                             "Unit": unit,
+                             "Voxel": voxel
+                            }
+
+    return {"dimensions": dimensions,
+            "tiles": tiles,
+            "base_folder": base_folder,
+            "exp_name": exp_name,
+            "acq_name": acq_name,
+            "xml_path": xml_path}
+
+
+
+# Block is defined by the x and y values of each edge
+class Block:
+    # __init__(self, left_top, right_bottom, width, height, xvoxel, yvoxel):
+    def __init__(self, left_top, right_bottom, width, height, xvoxel, yvoxel):
+        """
+            @param left_top: The location of the left_top point
+            @param right_bottom: The location of the right bottom
+            @param width: Number of pixels in x
+            @param height: Number of pixels in y
+            @param xvoxel: width of each pixel in physical length
+            @param yvoxel: height of each pixel in physical length
+            
+            left_top and right_bottom are calculated from the xml.properties file inside the Metadata folder
+            The edges self.left, self.right, self.top and self.bottom defines the corresponding edges
+            
+            self.xidx and self.yidx are the indices that would correspond to the image
+            
+            Purpose of this class:
+            The tilescan images have overlapping grids, so to merge all the grid-based tilescan images, 
+            we need to redefine the block in the positions of each grid block
+            
+            How to use:
+            First, we initialize each block with the overlapping coordinates. Then, consequentially, fix the overlapping
+            coordinates by using the function overlap_fix(block). The parameter block here is an object of Block, which is near.
+            The overlap_fix first checks where the overlap occurs with the block, then redefines the overlapping edge
+            
+            Note: The overlap_fix function consequentially assume overlapping blocks have the same non-overlapping position.
+                Make sure to check this with the plot below.
+        """
+        # Edges
+        self.left = left_top[0]
+        self.right = right_bottom[0]
+        self.top = left_top[1]
+        self.bottom = right_bottom[1]
+        
+        # x,y pixel count
+        self.width = width
+        self.height = height
+        # x and y pixel size in physical length
+        self.xvoxel = xvoxel
+        self.yvoxel = yvoxel
+        # x,y pixel indices
+        self.xidx = np.arange(self.width)
+        self.yidx = np.arange(self.height)
+        
+    # def is_inside_h(self, y):
+    #     # Checks whether the y-coordinate is inside the horizontal range defined by the block
+    #     if self.bottom < y and self.top > y:
+    #         return True
+    #     else:
+    #         return False
+    # def is_inside_v(self, x):
+    #     # Checks whether the x-coordinate is inside the vertical range defined by the block
+    #     if self.left < x and self.right > x:
+    #         return True
+    #     else:
+    #         return False
+    # def is_inside(self, x, y):
+    #     """
+    #         There must be a check for the microscope parameters flipx and swap-xy
+    #         The function returns true if the given location is inside the block
+            
+    #     """
+    #     print("Comparing x- (%g,%g) -- %g" % (left,right, x))
+    #     print("Comparing y- (%g,%g) -- %g" % (bottom, top, y))
+    #     if self.left < x and self.right > x and self.bottom < y and self.top > y: # inside the block
+    #         return True
+    #     else:
+    #         return False
+    def remove_left(self, right, xsz): # Remove the overlapping pixels up to right
+        # The length of the overlap
+        length = right - self.left
+        # print("x - Length = ", length)
+        # self.left = right
+        # Overlapping is removed
+        self.xidx = np.arange(int(length/self.xvoxel), xsz)
+        # print("First x-index = ", self.xidx[0])
+    def remove_bottom(self, top, ysz): # Remove the overlapping pixels up to top
+        # The length of the overlap
+        length = top - self.bottom
+        # print("y - Length = ", length)
+        # selt.
+        # Overlapping is removed
+        self.yidx = np.arange(int(length/self.yvoxel), ysz)
+        # print("First y-index = ", self.yidx[0])
+        
+    # def overlap_fix(self, block):
+    #     # Overlap on the right --> Right of the self block is the left of the param block
+    #     if self.is_inside_v(block.left):
+    #         block.remove_left(self.right)
+    #     if self.is_inside_h(block.bottom):
+    #         block.remove_bottom(self.top)
+        
+
+def merge(metadata): # For now, assumes all the acquire is xyzt
+
+    ###############################
+    #### Construct the filepaths for each tilescan tif image
+    ###############################
+    # Construct the filepaths to collect the tilescan images based on the provided metadata
+    znum = metadata["dimensions"]["Z"]["NumberOfElements"] # Number of z planes
+    # Find the number of digits
+    znum_digit = len(str(znum))
+    # zstr for file path
+    zstr_holder = f"z%0{znum_digit}d"
+
+    snum = metadata["dimensions"]["Stage"]["NumberOfElements"] # Number of tilescan images
+    # Find the number of digits
+    snum_digit = len(str(snum))
+    # sstr for file path
+    sstr_holder = f"s%0{snum_digit}d"
+
+    tnum = metadata["dimensions"]["T"]["NumberOfElements"] # Number of tilescan images
+    # Find the number of digits
+    tnum_digit = len(str(tnum))
+    # sstr for file path
+    tstr_holder = f"t%0{tnum_digit}d"
+
+    # folder and filenames
+    base_folder = metadata["base_folder"]
+    exp_name = metadata["exp_name"]
+    acq_name = metadata["acq_name"]
+
+    # fname_list = []
+    # for tix in range(tnum):
+    #     for six in range(snum):
+    #         for zix in range(znum):
+    #             tstr = tstr_holder % (tix)
+    #             sstr = sstr_holder % (six)
+    #             zstr = zstr_holder % (zix)
+    #             # Combine all params
+    #             fname = f"{base_folder}TileScan/{exp_name}_{acq_name}_{tstr}_{sstr}_{zstr}.tif"
+    #             fname_list.append(fname)
+    ###########################################
+    ###### Calculating the positions of each tile
+    ###### Constructing the blocks
+    ###########################################
+    xix_unique_ar = metadata["tiles"]["xix_unique_ar"]
+    yix_unique_ar = metadata["tiles"]["yix_unique_ar"]
+    xpos_lst = metadata["tiles"]["xpos_lst"]
+    ypos_lst = metadata["tiles"]["ypos_lst"]
+    xix_lst = metadata["tiles"]["xix_lst"]
+    yix_lst = metadata["tiles"]["yix_lst"]
+    xvoxel = metadata["dimensions"]["X"]["Voxel"]
+    yvoxel = metadata["dimensions"]["Y"]["Voxel"]
+    xsz = metadata["dimensions"]["X"]["NumberOfElements"]
+    ysz = metadata["dimensions"]["Y"]["NumberOfElements"]
+    # Define all the blocks and plot the edges
+    blocks_2d = np.empty((len(xix_unique_ar), len(yix_unique_ar)), dtype=Block)
+    for six in range(snum):
+        (x,y) = (xpos_lst[six], ypos_lst[six])   # convert to um
+        # Define the square
+        left = x-xvoxel*xsz/2
+        right = x+xvoxel*xsz/2
+        top = y+yvoxel*ysz/2
+        bottom = y-yvoxel*ysz/2
+        
+        xix = xix_lst[six]
+        yix = yix_lst[six]
+        
+        blocks_2d[xix, yix] = Block((left, top), (right, bottom), xsz, ysz, xvoxel, yvoxel)
+    ##########################################
+    ####### Remove overlap from neighbor blocks
+    ##########################################
+    for xix in xix_unique_ar[1:]:
+        for yix in yix_unique_ar:
+            # remove vertical overlap
+            blocks_2d[xix, yix].remove_left(blocks_2d[xix-1,yix].right, xsz)
+    for yix in yix_unique_ar[1:]:
+        for xix in xix_unique_ar:
+            # remove horizontal overlap
+            blocks_2d[xix, yix].remove_bottom(blocks_2d[xix,yix-1].top, ysz)
+    ################################
+    ####### Merge using the overlap-removed blocks
+    ################################
+    # Let's test merging a single timepoint for each z sections
+    # Run through all the tstr and zstr
+    tstr = tstr_holder % (0)
+    zstr = zstr_holder % (0)
+    sstr = sstr_holder % (0)
+    fpath_test = os.path.join(base_folder, "ch00", "TileScan", f"{exp_name}_{acq_name}_{tstr}_{sstr}_{zstr}_ch00.tif")
+    img_test = cv2.imread(fpath_test, cv2.IMREAD_GRAYSCALE)
+    test_height, test_width = img_test.shape
+
+    # For each timepoint
+    for tix in range(tnum):
+        tstr = tstr_holder % (tix)
+        # For each z section
+        for zix in range(znum):
+            zstr = zstr_holder % (zix)
+            # File path to merge into
+            fpath_merged = os.path.join(base_folder, "Merged", f"{exp_name}_{acq_name}_Merged_{tstr}_{zstr}.tif")
+            
+            # Create empty merged image
+            img_merged_bw = np.zeros((test_height*len(yix_unique_ar), test_width*len(xix_unique_ar)), dtype=img_test.dtype)
+
+            for six in range(snum):    # Run over the stage positions -> single merged tif file
+                sstr = sstr_holder % (six)
+                #Construct the filepath to merge
+    #             fpath = getFileName(fname_list[0], zstr_ix, zstr, tstr_ix, tstr, sstr_ix, sstr)
+                fpath = os.path.join(base_folder, "ch00", "TileScan", f"{exp_name}_{acq_name}_{tstr}_{sstr}_{zstr}_ch00.tif")
+                
+                # x,y indices
+                xix = xix_lst[six]
+                yix = yix_lst[six]
+                block = blocks_2d[xix,yix]
+                
+                img = cv2.imread(fpath, cv2.IMREAD_GRAYSCALE)
+    #             height,width = img.shape
+                width = len(block.xidx)
+                height = len(block.yidx)
+                
+                # # Image pixel positions
+                # xixar = np.arange(0,width) + width*xix
+                # yixar = np.arange(0,height) + height*yix
+                
+                # SwapXY and FlipX
+                flipped_img = np.transpose(np.flipud(img))
+    #####################################################################
+    #####################################################################
+                img_merged_bw[(yix*height):((yix+1)*height), (xix*width):((xix+1)*width)] = \
+                    flipped_img[block.yidx[0]:(block.yidx[-1]+1), block.xidx[0]:(block.xidx[-1]+1)]
+
+            print(f"Image merged for zstr = {zstr} ({zix}/{znum}), tstr = {tstr} ({tix}/{tnum})",
+                    end="\r", flush=True)
+
+            # Write the merged image
+            cv2.imwrite(fpath_merged, img_merged_bw)
