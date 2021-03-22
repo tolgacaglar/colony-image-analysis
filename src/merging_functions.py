@@ -15,8 +15,10 @@ from bs4 import BeautifulSoup
 # xml_path = metadata_folder + f"{exp_name}_{acq_name}_Properties.xml"
 
 
-def collect_metadata(base_folder, exp_name, acq_name):
-    metadata_folder = os.path.join(base_folder, "MetaData")
+def collect_metadata(exp_folder, exp_name, acq_name):
+    tilescan_folder = os.path.join(exp_folder, "TileScan")
+    acq_folder = os.path.join(tilescan_folder, f"{exp_name}_{acq_name}")
+    metadata_folder = os.path.join(tilescan_folder, "MetaData")
     xml_path = os.path.join(metadata_folder, f"{exp_name}_{acq_name}_Properties.xml")
 
     # Read xml and prepare for the soup
@@ -45,8 +47,8 @@ def collect_metadata(base_folder, exp_name, acq_name):
             "yix_lst": yix_lst,
             "xix_unique_ar": xix_unique_ar,
             "yix_unique_ar": yix_unique_ar,
-            "xpos_lst": xpos_lst,
-            "ypos_lst": ypos_lst,
+            "xpos_lst": xpos_lst*1e6,
+            "ypos_lst": ypos_lst*1e6,
             "tile_xcnt": len(xix_unique_ar),
             "tile_ycnt": len(yix_unique_ar)}
 
@@ -75,7 +77,8 @@ def collect_metadata(base_folder, exp_name, acq_name):
 
     return {"dimensions": dimensions,
             "tiles": tiles,
-            "base_folder": base_folder,
+            "exp_folder": exp_folder,
+            "acq_folder": acq_folder,
             "exp_name": exp_name,
             "acq_name": acq_name,
             "xml_path": xml_path}
@@ -201,7 +204,8 @@ def merge(metadata): # For now, assumes all the acquire is xyzt
     tstr_holder = f"t%0{tnum_digit}d"
 
     # folder and filenames
-    base_folder = metadata["base_folder"]
+    exp_folder = metadata["exp_folder"]
+    acq_folder = metadata["acq_folder"]
     exp_name = metadata["exp_name"]
     acq_name = metadata["acq_name"]
 
@@ -257,15 +261,19 @@ def merge(metadata): # For now, assumes all the acquire is xyzt
     ################################
     ####### Merge using the overlap-removed blocks
     ################################
+    merged_folder = os.path.join(exp_folder, "Merged")
     # Let's test merging a single timepoint for each z sections
     # Run through all the tstr and zstr
     tstr = tstr_holder % (0)
     zstr = zstr_holder % (0)
     sstr = sstr_holder % (0)
-    fpath_test = os.path.join(base_folder, "ch00", "TileScan", f"{exp_name}_{acq_name}_{tstr}_{sstr}_{zstr}_ch00.tif")
-    img_test = cv2.imread(fpath_test, cv2.IMREAD_GRAYSCALE)
-    test_height, test_width = img_test.shape
-
+    # fpath_test = os.path.join(acq_folder, f"{exp_name}_{acq_name}_{tstr}_{sstr}_{zstr}_ch00.tif")
+    # img_test = cv2.imread(fpath_test, cv2.IMREAD_GRAYSCALE)
+    # test_height, test_width = img_test.shape
+    
+    test_height = ysz
+    test_width = xsz
+    
     # For each timepoint
     for tix in range(tnum):
         tstr = tstr_holder % (tix)
@@ -273,16 +281,17 @@ def merge(metadata): # For now, assumes all the acquire is xyzt
         for zix in range(znum):
             zstr = zstr_holder % (zix)
             # File path to merge into
-            fpath_merged = os.path.join(base_folder, "Merged", f"{exp_name}_{acq_name}_Merged_{tstr}_{zstr}.tif")
+            fpath_merged = os.path.join(merged_folder, f"{exp_name}_{acq_name}", f"{exp_name}_{acq_name}_Merged_{tstr}_{zstr}.tif")
             
             # Create empty merged image
-            img_merged_bw = np.zeros((test_height*len(yix_unique_ar), test_width*len(xix_unique_ar)), dtype=img_test.dtype)
+            # img_merged_bw = np.zeros((test_height*len(yix_unique_ar), test_width*len(xix_unique_ar)), dtype=img_test.dtype)
+            img_merged_bw = np.zeros((test_height*len(yix_unique_ar), test_width*len(xix_unique_ar)), dtype=np.uint8)
 
             for six in range(snum):    # Run over the stage positions -> single merged tif file
                 sstr = sstr_holder % (six)
                 #Construct the filepath to merge
     #             fpath = getFileName(fname_list[0], zstr_ix, zstr, tstr_ix, tstr, sstr_ix, sstr)
-                fpath = os.path.join(base_folder, "ch00", "TileScan", f"{exp_name}_{acq_name}_{tstr}_{sstr}_{zstr}_ch00.tif")
+                fpath = os.path.join(acq_folder, f"{exp_name}_{acq_name}_{tstr}_{sstr}_{zstr}_ch00.tif")
                 
                 # x,y indices
                 xix = xix_lst[six]
@@ -293,6 +302,10 @@ def merge(metadata): # For now, assumes all the acquire is xyzt
     #             height,width = img.shape
                 width = len(block.xidx)
                 height = len(block.yidx)
+            
+                # If the img is empty, initiate with all zeros
+                if img is None:
+                    img = np.zeros((test_width, test_height))
                 
                 # # Image pixel positions
                 # xixar = np.arange(0,width) + width*xix
@@ -310,3 +323,96 @@ def merge(metadata): # For now, assumes all the acquire is xyzt
 
             # Write the merged image
             cv2.imwrite(fpath_merged, img_merged_bw)
+
+def make_movie(metadata):
+    # For a set number of t
+# dim_desc["tsz"] = 1
+# For a set number of z
+# dim_desc["zsz"] = 80
+    xunit = metadata["dimensions"]["X"]["Unit"]
+    zunit = metadata["dimensions"]["Z"]["Unit"]
+
+    xvoxel = metadata["dimensions"]["X"]["Voxel"]
+    zvoxel = metadata["dimensions"]["Z"]["Voxel"]
+    tsz = metadata["dimensions"]["T"]["NumberOfElements"]
+    zsz = metadata["dimensions"]["Z"]["NumberOfElements"]
+
+    xix_unique_ar = metadata["tiles"]["xix_unique_ar"]
+    xsz = metadata["dimensions"]["X"]["NumberOfElements"]
+
+    exp_name = metadata["exp_name"]
+    acq_name = metadata["acq_name"]
+    exp_folder = metadata["exp_folder"]
+    video_folder = os.path.join(exp_folder, "Videos_Marked")
+    merged_folder = os.path.join(exp_folder, "Merged")
+
+    # Find the number of digits
+    tnum_digit = len(str(tsz))
+    # tstr for file path
+    tstr_holder = f"t%0{tnum_digit}d"
+
+    # Find the number of digits
+    znum_digit = len(str(zsz))
+    # sstr for file path
+    zstr_holder = f"z%0{znum_digit}d"
+
+
+    dim_vid = (512,512)
+    
+    # fpath_test = os.path.join(merged_folder, f"{exp_name}_{acq_name}", 
+                # f"{exp_name}_{acq_name}_Merged_{tstr_holder % 0}_{zstr_holder % 0}.tif")
+    # img_test = cv2.imread(fpath_test, cv2.IMREAD_GRAYSCALE)
+    # test_height, test_width = img_test.shape
+    test_height = xsz*len(xix_unique_ar)
+
+    scale = dim_vid[0]/test_height
+    for tix in range(tsz):
+        tstr = tstr_holder % (tix)
+        video_path = os.path.join(video_folder, f"{exp_name}_{acq_name}", f"{exp_name}_{acq_name}_{tstr}.avi")
+        out = cv2.VideoWriter(video_path, cv2.VideoWriter_fourcc(*'DIVX'), 4, dim_vid)
+        # img_zsum = np.zeros(zsz)
+        for zix in range(zsz):
+            zstr = zstr_holder % (zix)
+            merged_path = os.path.join(merged_folder, f"{exp_name}_{acq_name}", f"{exp_name}_{acq_name}_Merged_{tstr}_{zstr}.tif")
+
+            print(f"Loading file = {merged_path}", end="\r", flush=True)
+            
+            img = cv2.imread(merged_path)
+            while (type(img) == type(None)):
+                # time.sleep(1) # wait 1 sec and retry
+                img = cv2.imread(merged_path)
+            img_blur = cv2.GaussianBlur(img, (11,11),0)
+
+            # Add contrast for better visualization.
+            alpha = 20
+            beta = -10
+            img_contrast = np.uint8(np.clip(alpha*img_blur + beta, 0, 255))
+            # Resize for video output
+            img_resized = cv2.resize(img_contrast, dim_vid)
+
+            # Scale bar
+            scalebar_length = 500   # in um
+            bar_start_coor = (50,440)
+            bar_end_coor = (int(50 + scalebar_length/xvoxel*scale),450)
+            bar_thickness = -1
+            bar_color = (255,255,255)
+            cv2.rectangle(img_resized, bar_start_coor, bar_end_coor, bar_color, bar_thickness)
+            
+            text_x = int(bar_start_coor[0])
+            text_y = int((bar_start_coor[1]+bar_end_coor[1])/2 + 30)
+            cv2.putText(img_resized,"%d %s" % (scalebar_length, xunit), (text_x,text_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
+            
+            zval_x = 260
+            zval_y = 50
+            z_str = "z=%.3f%s" % (zix*zvoxel, zunit)
+            cv2.putText(img_resized, z_str, (zval_x, zval_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
+            
+            # tval_x = 0
+            # tval_y = 20
+            # t_str_show = "t=20h %d min" % (27)
+            # cv2.putText(img_jpg, t_str_show, (tval_x, tval_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
+            
+            out.write(img_resized)
+            # img_zsum[zix] = sum(sum(sum(img_blur/255.)))/3
+            
+        out.release()

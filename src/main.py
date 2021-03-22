@@ -2,15 +2,14 @@ import merging_functions as mf
 
 import os
 
-exp_name = "EQ59_Gly_02022021"
-acq_name = "TileScan_Tp30-38"
+exp_name = "EQ59_Glu_03142021"
+acq_name_lst = ["TileScan_24-48h_xyzt"]#,
 
-exp_folder = f"D:/Tolga/Colony Images/{exp_name}/"
-base_folder = os.path.join(exp_folder, f"{exp_name}_{acq_name}")
-# metadata_folder = base_folder + "MetaData/"
+exp_folder = os.path.join("E:", "Tolga", f"{exp_name}")
 
-# xml_path = metadata_folder + f"{exp_name}_{acq_name}_Properties.xml"
+for acq_name in acq_name_lst:
+    metadata = mf.collect_metadata(exp_folder, exp_name, acq_name)
 
-metadata = mf.collect_metadata(base_folder, exp_name, acq_name)
+    mf.merge(metadata)
 
-mf.merge(metadata)
+    mf.make_movie(metadata]
