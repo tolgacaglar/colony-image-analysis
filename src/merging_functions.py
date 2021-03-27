@@ -14,12 +14,18 @@ from bs4 import BeautifulSoup
 
 # xml_path = metadata_folder + f"{exp_name}_{acq_name}_Properties.xml"
 
-
-def collect_metadata(exp_folder, exp_name, acq_name):
+# inner: is the metadata inside the acq_folder or outside?
+def collect_metadata(exp_folder, exp_name, acq_name, inner=False):
     tilescan_folder = os.path.join(exp_folder, "TileScan")
-    acq_folder = os.path.join(tilescan_folder, f"{exp_name}_{acq_name}")
-    metadata_folder = os.path.join(tilescan_folder, "MetaData")
-    xml_path = os.path.join(metadata_folder, f"{exp_name}_{acq_name}_Properties.xml")
+    if inner:
+        acq_folder = os.path.join(tilescan_folder, f"{acq_name}")
+        metadata_folder = os.path.join(tilescan_folder, f"{acq_name}", "MetaData")
+        xml_path = os.path.join(metadata_folder, f"{acq_name}_Properties.xml")
+    else:
+        acq_folder = os.path.join(tilescan_folder, f"{exp_name}_{acq_name}")
+        metadata_folder = os.path.join(tilescan_folder, "MetaData")
+        xml_path = os.path.join(metadata_folder, f"{exp_name}_{acq_name}_Properties.xml")
+    
 
     # Read xml and prepare for the soup
     with open(xml_path) as fp:
@@ -179,7 +185,7 @@ class Block:
     #         block.remove_bottom(self.top)
         
 
-def merge(metadata): # For now, assumes all the acquire is xyzt
+def merge(metadata, inner=False): # For now, assumes all the acquire is xyzt
 
     ###############################
     #### Construct the filepaths for each tilescan tif image
@@ -281,7 +287,11 @@ def merge(metadata): # For now, assumes all the acquire is xyzt
         for zix in range(znum):
             zstr = zstr_holder % (zix)
             # File path to merge into
-            fpath_merged = os.path.join(merged_folder, f"{exp_name}_{acq_name}", f"{exp_name}_{acq_name}_Merged_{tstr}_{zstr}.tif")
+            merged_acq_folder = os.path.join(merged_folder, f"{exp_name}_{acq_name}")
+            if not os.path.isdir(merged_acq_folder):
+                os.mkdir(merged_acq_folder)
+            
+            fpath_merged = os.path.join(merged_acq_folder, f"{exp_name}_{acq_name}_Merged_{tstr}_{zstr}.tif")
             
             # Create empty merged image
             # img_merged_bw = np.zeros((test_height*len(yix_unique_ar), test_width*len(xix_unique_ar)), dtype=img_test.dtype)
@@ -291,7 +301,12 @@ def merge(metadata): # For now, assumes all the acquire is xyzt
                 sstr = sstr_holder % (six)
                 #Construct the filepath to merge
     #             fpath = getFileName(fname_list[0], zstr_ix, zstr, tstr_ix, tstr, sstr_ix, sstr)
-                fpath = os.path.join(acq_folder, f"{exp_name}_{acq_name}_{tstr}_{sstr}_{zstr}_ch00.tif")
+                if inner:
+                    fpath = os.path.join(acq_folder, f"{acq_name}_{tstr}_{sstr}_{zstr}_ch00.tif")
+                else:
+                    fpath = os.path.join(acq_folder, f"{exp_name}_{acq_name}_{tstr}_{sstr}_{zstr}_ch00.tif")
+                if not os.path.isfile(fpath):
+                    print(f"TileScan image file path not defined:\n\t {fpath}")
                 
                 # x,y indices
                 xix = xix_lst[six]
@@ -368,7 +383,10 @@ def make_movie(metadata):
     scale = dim_vid[0]/test_height
     for tix in range(tsz):
         tstr = tstr_holder % (tix)
-        video_path = os.path.join(video_folder, f"{exp_name}_{acq_name}", f"{exp_name}_{acq_name}_{tstr}.avi")
+        video_acq_folder = os.path.join(video_folder, f"{exp_name}_{acq_name}")
+        if not os.path.isdir(video_acq_folder):
+            os.mkdir(video_acq_folder)
+        video_path = os.path.join(video_acq_folder, f"{exp_name}_{acq_name}_{tstr}.avi")
         out = cv2.VideoWriter(video_path, cv2.VideoWriter_fourcc(*'DIVX'), 4, dim_vid)
         # img_zsum = np.zeros(zsz)
         for zix in range(zsz):
