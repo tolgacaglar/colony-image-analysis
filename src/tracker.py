@@ -1,8 +1,9 @@
 class IndexTracker(object):
-    def __init__(self, ax, X, plottype, init_idx=None, args_dict={}):
+    def __init__(self, ax, X, plottype, datatype, init_idx=None, args_dict={}):
         self.ax = ax
         self.X = X
         self.plottype = plottype
+        self.datatype = datatype
         self.args_dict = args_dict
         
         if init_idx is not None:
@@ -30,7 +31,7 @@ class IndexTracker(object):
             xvals = self.X[0,:,self.ind]
             yvals = self.X[1,:,self.ind]
             
-            self.im = ax.plot(xvals, yvals)[0]
+            self.im = ax.plot(xvals, yvals, self.datatype)[0]
         elif self.plottype == "loglog":
             # Line plot has data structured as: X[0,:,slice] as the x values, X[1,:,slice] as the y values
             xvals = self.X[0,:,self.ind]

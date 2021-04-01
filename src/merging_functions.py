@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import os
 import cv2
+import datetime
 
 from bs4 import BeautifulSoup
 
@@ -80,15 +81,19 @@ def collect_metadata(exp_folder, exp_name, acq_name, inner=False):
                              "Unit": unit,
                              "Voxel": voxel
                             }
-
+    
+    # Datetime object from the StartTime
+    datetime_str = soup.find("StartTime").text
+    datetime_obj = datetime.datetime.strptime(datetime_str, "%m/%d/%Y %I:%M:%S %p.%f")
     return {"dimensions": dimensions,
             "tiles": tiles,
             "exp_folder": exp_folder,
             "acq_folder": acq_folder,
             "exp_name": exp_name,
             "acq_name": acq_name,
-            "xml_path": xml_path}
-
+            "xml_path": xml_path,
+            "start_time": datetime_obj}
+            
 
 
 # Block is defined by the x and y values of each edge
@@ -339,7 +344,7 @@ def merge(metadata, inner=False): # For now, assumes all the acquire is xyzt
             # Write the merged image
             cv2.imwrite(fpath_merged, img_merged_bw)
 
-def make_movie(metadata):
+def make_movie(metadata, ROIx, ROIy, RR, dim_vid, marked=False, full_stage=False):
     # For a set number of t
 # dim_desc["tsz"] = 1
 # For a set number of z
@@ -352,13 +357,25 @@ def make_movie(metadata):
     tsz = metadata["dimensions"]["T"]["NumberOfElements"]
     zsz = metadata["dimensions"]["Z"]["NumberOfElements"]
 
-    xix_unique_ar = metadata["tiles"]["xix_unique_ar"]
-    xsz = metadata["dimensions"]["X"]["NumberOfElements"]
+    # xix_unique_ar = metadata["tiles"]["xix_unique_ar"]
+    # xsz = metadata["dimensions"]["X"]["NumberOfElements"]
 
     exp_name = metadata["exp_name"]
     acq_name = metadata["acq_name"]
     exp_folder = metadata["exp_folder"]
-    video_folder = os.path.join(exp_folder, "Videos_Marked")
+
+    if marked:
+        marked_str = "Marked"
+    else:
+        marked_str = "Unmarked"
+
+    if full_stage:
+        full_stage_str = "Full"
+    else:
+        full_stage_str = "ROI"
+
+    video_folder = os.path.join(exp_folder, f"Videos_{full_stage_str}_{marked_str}")
+
     merged_folder = os.path.join(exp_folder, "Merged")
 
     # Find the number of digits
@@ -374,11 +391,13 @@ def make_movie(metadata):
 
     dim_vid = (512,512)
     
-    # fpath_test = os.path.join(merged_folder, f"{exp_name}_{acq_name}", 
-                # f"{exp_name}_{acq_name}_Merged_{tstr_holder % 0}_{zstr_holder % 0}.tif")
-    # img_test = cv2.imread(fpath_test, cv2.IMREAD_GRAYSCALE)
-    # test_height, test_width = img_test.shape
-    test_height = xsz*len(xix_unique_ar)
+    fpath_test = os.path.join(merged_folder, f"{exp_name}_{acq_name}", 
+                f"{exp_name}_{acq_name}_Merged_{tstr_holder % 0}_{zstr_holder % 0}.tif")
+    img_test = cv2.imread(fpath_test, cv2.IMREAD_GRAYSCALE)
+    if full_stage:
+        test_height = img_test.shape[0]
+    else:
+        test_height = 2*RR
 
     scale = dim_vid[0]/test_height
     for tix in range(tsz):
@@ -396,10 +415,12 @@ def make_movie(metadata):
             print(f"Loading file = {merged_path}", end="\r", flush=True)
             
             img = cv2.imread(merged_path)
-            while (type(img) == type(None)):
-                # time.sleep(1) # wait 1 sec and retry
-                img = cv2.imread(merged_path)
-            img_blur = cv2.GaussianBlur(img, (11,11),0)
+            # Choose ROI image
+            if full_stage:
+                roi_img = img
+            else:
+                roi_img = img[ROIy[0]:ROIy[1], ROIx[0]:ROIx[1]]
+            img_blur = cv2.GaussianBlur(roi_img, (11,11), 0)
 
             # Add contrast for better visualization.
             alpha = 20
@@ -408,28 +429,29 @@ def make_movie(metadata):
             # Resize for video output
             img_resized = cv2.resize(img_contrast, dim_vid)
 
-            # Scale bar
-            scalebar_length = 500   # in um
-            bar_start_coor = (50,440)
-            bar_end_coor = (int(50 + scalebar_length/xvoxel*scale),450)
-            bar_thickness = -1
-            bar_color = (255,255,255)
-            cv2.rectangle(img_resized, bar_start_coor, bar_end_coor, bar_color, bar_thickness)
-            
-            text_x = int(bar_start_coor[0])
-            text_y = int((bar_start_coor[1]+bar_end_coor[1])/2 + 30)
-            cv2.putText(img_resized,"%d %s" % (scalebar_length, xunit), (text_x,text_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
-            
-            zval_x = 260
-            zval_y = 50
-            z_str = "z=%.3f%s" % (zix*zvoxel, zunit)
-            cv2.putText(img_resized, z_str, (zval_x, zval_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
-            
-            # tval_x = 0
-            # tval_y = 20
-            # t_str_show = "t=20h %d min" % (27)
-            # cv2.putText(img_jpg, t_str_show, (tval_x, tval_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
-            
+            if marked:
+                # Scale bar
+                scalebar_length = 500   # in um
+                bar_start_coor = (50,440)
+                bar_end_coor = (int(50 + scalebar_length/xvoxel*scale),450)
+                bar_thickness = -1
+                bar_color = (255,255,255)
+                cv2.rectangle(img_resized, bar_start_coor, bar_end_coor, bar_color, bar_thickness)
+                
+                text_x = int(bar_start_coor[0])
+                text_y = int((bar_start_coor[1]+bar_end_coor[1])/2 + 30)
+                cv2.putText(img_resized,"%d %s" % (scalebar_length, xunit), (text_x,text_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
+                
+                zval_x = 260
+                zval_y = 50
+                z_str = "z=%.3f%s" % (zix*zvoxel, zunit)
+                cv2.putText(img_resized, z_str, (zval_x, zval_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
+                
+                # tval_x = 0
+                # tval_y = 20
+                # t_str_show = "t=20h %d min" % (27)
+                # cv2.putText(img_jpg, t_str_show, (tval_x, tval_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
+                
             out.write(img_resized)
             # img_zsum[zix] = sum(sum(sum(img_blur/255.)))/3
             
