@@ -24,27 +24,32 @@ class IndexTracker(object):
         if (self.zvals is not None):
             self.zval = self.zvals[self.ind]
         
-        rows, cols, self.slices = X.shape
-
-        if self.plottype == "line":
-            # Line plot has data structured as: X[0,:,slice] as the x values, X[1,:,slice] as the y values
-            xvals = self.X[0,:,self.ind]
-            yvals = self.X[1,:,self.ind]
-            
+        if self.plottype == "line_lst":
+            self.slices = len(self.X[0])
+            xvals = self.X[0][self.ind]
+            yvals = self.X[1][self.ind]
             self.im = ax.plot(xvals, yvals, self.datatype)[0]
-        elif self.plottype == "loglog":
-            # Line plot has data structured as: X[0,:,slice] as the x values, X[1,:,slice] as the y values
-            xvals = self.X[0,:,self.ind]
-            yvals = self.X[1,:,self.ind]
-            
-            self.im = ax.loglog(xvals, yvals)[0]
-            
-        elif self.plottype == "image":
-            # Args dictionary, includes plot parameters
-            # x,y limits saved in arg extent
-            
-            self.im = ax.imshow(self.X[:, :, self.ind],
-                               extent = self.args_dict.get("extent"))
+        else:
+            rows, cols, self.slices = X.shape
+            if self.plottype == "line":
+                # Line plot has data structured as: X[0,:,slice] as the x values, X[1,:,slice] as the y values
+                xvals = self.X[0,:,self.ind]
+                yvals = self.X[1,:,self.ind]
+
+                self.im = ax.plot(xvals, yvals, self.datatype)[0]
+            elif self.plottype == "loglog":
+                # Line plot has data structured as: X[0,:,slice] as the x values, X[1,:,slice] as the y values
+                xvals = self.X[0,:,self.ind]
+                yvals = self.X[1,:,self.ind]
+
+                self.im = ax.loglog(xvals, yvals)[0]
+
+            elif self.plottype == "image":
+                # Args dictionary, includes plot parameters
+                # x,y limits saved in arg extent
+
+                self.im = ax.imshow(self.X[:, :, self.ind],
+                                   extent = self.args_dict.get("extent"))
         self.update()
 
     def onscroll(self, event):
@@ -58,6 +63,10 @@ class IndexTracker(object):
     def update(self):
         if self.plottype == "image":
             self.im.set_data(self.X[:, :, self.ind])
+        elif self.plottype == "line_lst":
+            xvals = self.X[0][self.ind]
+            yvals = self.X[1][self.ind]
+            self.im.set_data(xvals,yvals)
         elif self.plottype == "line":
             xvals = self.X[0,:,self.ind]
             yvals = self.X[1,:,self.ind]
