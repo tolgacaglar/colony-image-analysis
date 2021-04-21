@@ -208,11 +208,19 @@ def merge(metadata, inner=False): # For now, assumes all the acquire is xyzt
     # sstr for file path
     sstr_holder = f"s%0{snum_digit}d"
 
-    tnum = metadata["dimensions"]["T"]["NumberOfElements"] # Number of tilescan images
-    # Find the number of digits
+    # Check if tstr exists
+    tstr_exists = True
+    try:
+        tnum = metadata["dimensions"]["T"]["NumberOfElements"] # Number of tilescan images
+        # Find the number of digits
+    except KeyError:
+        # tnum is not set
+        tnum = 1
+        tstr_exists = False
+
     tnum_digit = len(str(tnum))
     # sstr for file path
-    tstr_holder = f"t%0{tnum_digit}d"
+    tstr_holder = f"t%0{tnum_digit}d"        
 
     # folder and filenames
     exp_folder = metadata["exp_folder"]
@@ -287,7 +295,9 @@ def merge(metadata, inner=False): # For now, assumes all the acquire is xyzt
     
     # For each timepoint
     for tix in range(tnum):
+        # Only if tstr_holder exists
         tstr = tstr_holder % (tix)
+        
         # For each z section
         for zix in range(znum):
             zstr = zstr_holder % (zix)
@@ -297,6 +307,7 @@ def merge(metadata, inner=False): # For now, assumes all the acquire is xyzt
                 os.mkdir(merged_acq_folder)
             
             fpath_merged = os.path.join(merged_acq_folder, f"{exp_name}_{acq_name}_Merged_{tstr}_{zstr}.tif")
+
             
             # Create empty merged image
             # img_merged_bw = np.zeros((test_height*len(yix_unique_ar), test_width*len(xix_unique_ar)), dtype=img_test.dtype)
@@ -307,9 +318,16 @@ def merge(metadata, inner=False): # For now, assumes all the acquire is xyzt
                 #Construct the filepath to merge
     #             fpath = getFileName(fname_list[0], zstr_ix, zstr, tstr_ix, tstr, sstr_ix, sstr)
                 if inner:
-                    fpath = os.path.join(acq_folder, f"{acq_name}_{tstr}_{sstr}_{zstr}_ch00.tif")
+                    if tstr_exists:
+                        fpath = os.path.join(acq_folder, f"{acq_name}_{tstr}_{sstr}_{zstr}_ch00.tif")
+                    else:
+                        fpath = os.path.join(acq_folder, f"{acq_name}_{sstr}_{zstr}_ch00.tif")
                 else:
-                    fpath = os.path.join(acq_folder, f"{exp_name}_{acq_name}_{tstr}_{sstr}_{zstr}_ch00.tif")
+                    if tstr_exists:
+                        fpath = os.path.join(acq_folder, f"{exp_name}_{acq_name}_{tstr}_{sstr}_{zstr}_ch00.tif")
+                    else:
+                        fpath = os.path.join(acq_folder, f"{exp_name}_{acq_name}_{sstr}_{zstr}_ch00.tif")
+                        
                 if not os.path.isfile(fpath):
                     print(f"TileScan image file path not defined:\n\t {fpath}")
                 
