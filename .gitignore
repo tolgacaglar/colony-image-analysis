@@ -114,6 +114,9 @@ venv.bak/
 .spyderproject
 .spyproject
 
+# VS code settings
+.vscode
+
 # Rope project settings
 .ropeproject
 
@@ -134,3 +137,4 @@ Resources/
 
 # No need to use the backup files anymore
 old_backup/
+unused_portion/
