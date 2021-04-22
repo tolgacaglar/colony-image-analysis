@@ -362,7 +362,7 @@ def merge(metadata, inner=False): # For now, assumes all the acquire is xyzt
             # Write the merged image
             cv2.imwrite(fpath_merged, img_merged_bw)
 
-def make_movie(metadata, ROIx, ROIy, RR, dim_vid, marked=False, full_stage=False):
+def make_movie(metadata, ROIx, ROIy, RR, dim_vid, ksz_um, marked=False, full_stage=False):
     # For a set number of t
 # dim_desc["tsz"] = 1
 # For a set number of z
@@ -372,8 +372,22 @@ def make_movie(metadata, ROIx, ROIy, RR, dim_vid, marked=False, full_stage=False
 
     xvoxel = metadata["dimensions"]["X"]["Voxel"]
     zvoxel = metadata["dimensions"]["Z"]["Voxel"]
-    tsz = metadata["dimensions"]["T"]["NumberOfElements"]
+    
+    # tsz = metadata["dimensions"]["T"]["NumberOfElements"]
+    xsz = metadata["dimensions"]["X"]["NumberOfElements"]
+    ysz = metadata["dimensions"]["Y"]["NumberOfElements"]
     zsz = metadata["dimensions"]["Z"]["NumberOfElements"]
+
+    w = metadata["tiles"]["xix_unique_ar"].size*xsz
+    h = metadata["tiles"]["yix_unique_ar"].size*ysz
+
+    ksz_um = 10 # Kernel size for filters in um
+
+    ksz_px = ksz_um/xvoxel
+    # Make kernel size an odd integer
+    ksz_px = int(ksz_px/2)*2 + 1
+    print(f"width: {w} - height: {h}")
+    print(f"kernel um: {ksz_um} - kernel px: {ksz_px}")
 
     # xix_unique_ar = metadata["tiles"]["xix_unique_ar"]
     # xsz = metadata["dimensions"]["X"]["NumberOfElements"]
@@ -396,21 +410,18 @@ def make_movie(metadata, ROIx, ROIy, RR, dim_vid, marked=False, full_stage=False
 
     merged_folder = os.path.join(exp_folder, "Merged")
 
-    # Find the number of digits
-    tnum_digit = len(str(tsz))
-    # tstr for file path
-    tstr_holder = f"t%0{tnum_digit}d"
+    # # Find the number of digits
+    # tnum_digit = len(str(tsz))
+    # # tstr for file path
+    # tstr_holder = f"t%0{tnum_digit}d"
 
     # Find the number of digits
     znum_digit = len(str(zsz))
     # sstr for file path
     zstr_holder = f"z%0{znum_digit}d"
-
-
-    dim_vid = (512,512)
     
     fpath_test = os.path.join(merged_folder, f"{exp_name}_{acq_name}", 
-                f"{exp_name}_{acq_name}_Merged_{tstr_holder % 0}_{zstr_holder % 0}.tif")
+                f"{exp_name}_{acq_name}_Merged_t0_{zstr_holder % 0}.tif")
     img_test = cv2.imread(fpath_test, cv2.IMREAD_GRAYSCALE)
     if full_stage:
         test_height = img_test.shape[0]
@@ -418,59 +429,58 @@ def make_movie(metadata, ROIx, ROIy, RR, dim_vid, marked=False, full_stage=False
         test_height = 2*RR
 
     scale = dim_vid[0]/test_height
-    for tix in range(tsz):
-        tstr = tstr_holder % (tix)
-        video_acq_folder = os.path.join(video_folder, f"{exp_name}_{acq_name}")
-        if not os.path.isdir(video_acq_folder):
-            os.mkdir(video_acq_folder)
-        video_path = os.path.join(video_acq_folder, f"{exp_name}_{acq_name}_{tstr}.avi")
-        out = cv2.VideoWriter(video_path, cv2.VideoWriter_fourcc(*'DIVX'), 4, dim_vid)
-        # img_zsum = np.zeros(zsz)
-        for zix in range(zsz):
-            zstr = zstr_holder % (zix)
-            merged_path = os.path.join(merged_folder, f"{exp_name}_{acq_name}", f"{exp_name}_{acq_name}_Merged_{tstr}_{zstr}.tif")
 
-            print(f"Loading file = {merged_path}", end="\r", flush=True)
+    video_acq_folder = os.path.join(video_folder, f"{exp_name}_{acq_name}")
+    if not os.path.isdir(video_acq_folder):
+        os.mkdir(video_acq_folder)
+    video_path = os.path.join(video_acq_folder, f"{exp_name}_{acq_name}.avi")
+    out = cv2.VideoWriter(video_path, cv2.VideoWriter_fourcc(*'DIVX'), 4, dim_vid)
+    # img_zsum = np.zeros(zsz)
+    for zix in range(zsz):
+        zstr = zstr_holder % (zix)
+        merged_path = os.path.join(merged_folder, f"{exp_name}_{acq_name}", f"{exp_name}_{acq_name}_Merged_t0_{zstr}.tif")
+
+        print(f"Loading file = {merged_path}", end="\r", flush=True)
+        
+        img = cv2.imread(merged_path)
+        # Choose ROI image
+        if full_stage:
+            roi_img = img
+        else:
+            roi_img = img[ROIy[0]:ROIy[1], ROIx[0]:ROIx[1]]
+        img_blur = cv2.GaussianBlur(roi_img, (ksz_px,ksz_px), 0)
+
+        # Add contrast for better visualization.
+        alpha = 20
+        beta = -10
+        img_contrast = np.uint8(np.clip(alpha*img_blur + beta, 0, 255))
+        # Resize for video output
+        img_resized = cv2.resize(img_contrast, dim_vid)
+
+        if marked:
+            # Scale bar
+            scalebar_length = 500   # in um
+            bar_start_coor = (50,440)
+            bar_end_coor = (int(50 + scalebar_length/xvoxel*scale),450)
+            bar_thickness = -1
+            bar_color = (255,255,255)
+            cv2.rectangle(img_resized, bar_start_coor, bar_end_coor, bar_color, bar_thickness)
             
-            img = cv2.imread(merged_path)
-            # Choose ROI image
-            if full_stage:
-                roi_img = img
-            else:
-                roi_img = img[ROIy[0]:ROIy[1], ROIx[0]:ROIx[1]]
-            img_blur = cv2.GaussianBlur(roi_img, (11,11), 0)
-
-            # Add contrast for better visualization.
-            alpha = 20
-            beta = -10
-            img_contrast = np.uint8(np.clip(alpha*img_blur + beta, 0, 255))
-            # Resize for video output
-            img_resized = cv2.resize(img_contrast, dim_vid)
-
-            if marked:
-                # Scale bar
-                scalebar_length = 500   # in um
-                bar_start_coor = (50,440)
-                bar_end_coor = (int(50 + scalebar_length/xvoxel*scale),450)
-                bar_thickness = -1
-                bar_color = (255,255,255)
-                cv2.rectangle(img_resized, bar_start_coor, bar_end_coor, bar_color, bar_thickness)
-                
-                text_x = int(bar_start_coor[0])
-                text_y = int((bar_start_coor[1]+bar_end_coor[1])/2 + 30)
-                cv2.putText(img_resized,"%d %s" % (scalebar_length, xunit), (text_x,text_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
-                
-                zval_x = 260
-                zval_y = 50
-                z_str = "z=%.3f%s" % (zix*zvoxel, zunit)
-                cv2.putText(img_resized, z_str, (zval_x, zval_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
-                
-                # tval_x = 0
-                # tval_y = 20
-                # t_str_show = "t=20h %d min" % (27)
-                # cv2.putText(img_jpg, t_str_show, (tval_x, tval_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
-                
-            out.write(img_resized)
-            # img_zsum[zix] = sum(sum(sum(img_blur/255.)))/3
+            text_x = int(bar_start_coor[0])
+            text_y = int((bar_start_coor[1]+bar_end_coor[1])/2 + 30)
+            cv2.putText(img_resized,"%d %s" % (scalebar_length, xunit), (text_x,text_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
             
-        out.release()
+            zval_x = 260
+            zval_y = 50
+            z_str = "z=%.3f%s" % (zix*zvoxel, zunit)
+            cv2.putText(img_resized, z_str, (zval_x, zval_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
+            
+            # tval_x = 0
+            # tval_y = 20
+            # t_str_show = "t=20h %d min" % (27)
+            # cv2.putText(img_jpg, t_str_show, (tval_x, tval_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
+            
+        out.write(img_resized)
+        # img_zsum[zix] = sum(sum(sum(img_blur/255.)))/3
+        
+    out.release()
