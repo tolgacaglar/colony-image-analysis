@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 
 # inner: is the metadata inside the acq_folder or outside?
 def collect_metadata(exp_folder, exp_name, acq_name, inner=False):
-    tilescan_folder = os.path.join(exp_folder, "TileScan")
+    tilescan_folder = os.path.join(exp_folder, "exp_name")
     if inner:
         acq_folder = os.path.join(tilescan_folder, f"{acq_name}")
         metadata_folder = os.path.join(tilescan_folder, f"{acq_name}", "MetaData")
