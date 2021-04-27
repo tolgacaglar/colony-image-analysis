@@ -14,15 +14,15 @@ import pandas as pd
 # acq_name_lst = []
 
 
-exp_name = "EQ59_Gly_04242021"
-exp_folder = os.path.join("D:", "Tolga", f"{exp_name}")
+exp_name = "EQ59_Glu_04242021"
+exp_folder = os.path.join("D:\\", "Tolga", f"{exp_name}")
 inner = True
 tstr = "t0"
 dim = (512,512)
 ksz_um = 10 # Kernel size for filters in um
 
 full_stage = True
-marked = True 
+marked = False 
 
 plate_csv_path = os.path.join(exp_folder, f"{exp_name}_Plates.csv")
 timepoint_csv_path = os.path.join(exp_folder, f"{exp_name}_TimePoints.csv")
@@ -40,6 +40,7 @@ for (index, row) in df.iterrows():
     acq_name = f"TileScan_Plt{plt_id}_Tp{tp_id}"
     metadata = mf.collect_metadata(exp_folder, exp_name, acq_name, inner=inner)
 
-    # mf.merge(metadata, inner)
+    mf.merge(metadata, inner)
 
-    mf.make_movie(metadata, 0, 0, 0, dim, ksz_um, marked, full_stage)
+    mf.make_movie(metadata, 0, 0, 0, dim, ksz_um, False, full_stage)
+    mf.make_movie(metadata, 0, 0, 0, dim, ksz_um, True, full_stage)
