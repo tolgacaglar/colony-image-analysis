@@ -14,7 +14,7 @@ import pandas as pd
 # acq_name_lst = []
 
 
-exp_name = "EQ59_Glu_04242021"
+exp_name = "EQ59_Gly_04172021"
 exp_folder = os.path.join("D:\\", "Tolga", f"{exp_name}")
 inner = True
 tstr = "t0"

@@ -198,13 +198,13 @@ def merge(metadata, inner=False): # For now, assumes all the acquire is xyzt
     # Construct the filepaths to collect the tilescan images based on the provided metadata
     znum = metadata["dimensions"]["Z"]["NumberOfElements"] # Number of z planes
     # Find the number of digits
-    znum_digit = len(str(znum))
+    znum_digit = len(str(znum-1))
     # zstr for file path
     zstr_holder = f"z%0{znum_digit}d"
 
     snum = metadata["dimensions"]["Stage"]["NumberOfElements"] # Number of tilescan images
     # Find the number of digits
-    snum_digit = len(str(snum))
+    snum_digit = len(str(snum-1))
     # sstr for file path
     sstr_holder = f"s%0{snum_digit}d"
 
@@ -218,7 +218,7 @@ def merge(metadata, inner=False): # For now, assumes all the acquire is xyzt
         tnum = 1
         tstr_exists = False
 
-    tnum_digit = len(str(tnum))
+    tnum_digit = len(str(tnum-1))
     # sstr for file path
     tstr_holder = f"t%0{tnum_digit}d"        
 
@@ -416,7 +416,7 @@ def make_movie(metadata, ROIx, ROIy, RR, dim_vid, ksz_um, marked=False, full_sta
     # tstr_holder = f"t%0{tnum_digit}d"
 
     # Find the number of digits
-    znum_digit = len(str(zsz))
+    znum_digit = len(str(zsz-1))
     # sstr for file path
     zstr_holder = f"z%0{znum_digit}d"
     
