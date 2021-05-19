@@ -1,0 +1,7 @@
+media_id,carbon,carbon_conc_mM,nitrogen,nitrogen_conc_mM,base_media_id
+1,Glucose,10,Ammonia,10,1
+2,Glycerol,20,Ammonia,10,1
+3,Glucose,20,Ammonia,10,1
+4,Glucose,10,Ammonia,10,2
+5,Glucose,10,Ammonia,10,3
+6,Glucose,40,Ammonia,10,1

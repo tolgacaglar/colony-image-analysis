@@ -1,0 +1,4 @@
+base_media_id,base_media_abbr,buffer,buffer_conc_mM,Description
+1,N-C-,phosphate,112,"Final concentrations of carbon and nitrogen-free media: NaCl (42.5mM), MgSO4 (0.4mM), K2SO4 (5.75mM), K2HPO4 (77.56mM), KH2PO4 (34.54mM)"
+2,N-C-,phosphate,56,"Final concentrations of carbon and nitrogen-free media: NaCl (120mM), MgSO4 (0.4mM), K2SO4 (5.75mM), K2HPO4 (38.78mM), KH2PO4 (17.27mM)"
+3,N-C-,phosphate,11,"Final concentrations of carbon and nitrogen-free media: NaCl (180mM), MgSO4 (0.4mM), K2SO4 (5.75mM), K2HPO4 (7.76mM), KH2PO4 (3.45mM)"
