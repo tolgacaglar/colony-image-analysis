@@ -10,3 +10,5 @@ experiment_id,exp_name,exp_date,media_id
 9,EQ59_Glu_20mM,5/8/2021,3
 10,EQ59_Glu_20mMb,5/15/2021,3
 11,EQ59_Glu_40mMa,5/15/2021,6
+12,EQ59_Glu_10mM_PBSb,5/19/2021,7
+13,EQ59_Glu_30mM_PBSa,5/19/2021,8
