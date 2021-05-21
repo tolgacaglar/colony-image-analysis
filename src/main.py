@@ -17,7 +17,8 @@ import pandas as pd
 # exp_name = "EQ59_Glu_10mM_PBS"
 # exp_name = "EQ59_Glu_50mM_PBS"
 # exp_name = "EQ59_Glu_40mMa"
-exp_name = "EQ59_Glu_40mMa"
+# exp_name = "EQ59_Glu_40mMa"
+exp_name = "EQ59_Glu_20mM_PBS_30mM"
 base_folder = os.path.join("D:\\", "Tolga")
 
 exp_folder = os.path.join(base_folder, f"{exp_name}")
